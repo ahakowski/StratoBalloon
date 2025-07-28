@@ -21,7 +21,6 @@ def download_gfs_subset(lat, lon, date, run):
 
     params = {
         "file": file,
-        # Poziomy ciśnienia do 10 hPa (~30 km)
         "lev_1000_mb": "on",
         "lev_925_mb": "on",
         "lev_850_mb": "on",
@@ -63,7 +62,7 @@ def pressure_to_altitude(pressure_hpa):
     return round(44330 * (1 - (pressure_hpa / 1013.25)**0.1903))
 
 # --- Parsowanie danych GFS ---
-def parse_gfs_data(grib_file, lat, lon):
+def parse_gfs_data(grib_file, lat, lon, forecast_datetime):
     ds = xr.open_dataset(grib_file, engine="cfgrib")
     u_wind = ds["u"].sel(latitude=lat, longitude=lon, method="nearest")
     v_wind = ds["v"].sel(latitude=lat, longitude=lon, method="nearest")
@@ -78,7 +77,8 @@ def parse_gfs_data(grib_file, lat, lon):
             "Pressure_hPa": int(level),
             "Altitude_m": pressure_to_altitude(level),
             "WindSpeed_m_s": round(speed, 2),
-            "WindDir_deg": round(direction, 1)
+            "WindDir_deg": round(direction, 1),
+            "Forecast_Run": forecast_datetime
         })
     return pd.DataFrame(profile_data).sort_values("Altitude_m")
 
@@ -98,7 +98,7 @@ def simulate_balloon(lat, lon, ascent_rate, descent_rate, burst_altitude, wind_p
     # Wznoszenie
     for h in range(100, burst_altitude + 100, 100):
         wind_speed, wind_dir = interpolate_wind(wind_profile, h)
-        dt = 100 / ascent_rate  # czas na wzniesienie o 100 m
+        dt = 100 / ascent_rate
         t += dt
         dx = (wind_speed) * dt * np.cos(np.deg2rad(270 - wind_dir)) / 111000
         dy = (wind_speed) * dt * np.sin(np.deg2rad(270 - wind_dir)) / 111000
@@ -110,7 +110,7 @@ def simulate_balloon(lat, lon, ascent_rate, descent_rate, burst_altitude, wind_p
     # Opadanie
     for h in range(burst_altitude - 100, 0, -100):
         wind_speed, wind_dir = interpolate_wind(wind_profile, h)
-        dt = 100 / abs(descent_rate)  # czas na spadek o 100 m
+        dt = 100 / abs(descent_rate)
         t += dt
         dx = (wind_speed) * dt * np.cos(np.deg2rad(270 - wind_dir)) / 111000
         dy = (wind_speed) * dt * np.sin(np.deg2rad(270 - wind_dir)) / 111000
@@ -142,22 +142,29 @@ if "wind_profile" not in st.session_state:
     st.session_state.wind_profile = None
 if "trajectory_df" not in st.session_state:
     st.session_state.trajectory_df = None
+if "forecast_info" not in st.session_state:
+    st.session_state.forecast_info = None
 
 if st.button("Pobierz dane GFS i uruchom symulację"):
-    grib_file = download_gfs_subset(start_lat, start_lon, user_datetime.strftime("%Y%m%d"), "06")
+    gfs_date = user_datetime.strftime("%Y%m%d")
+    run = "06"  # dla przykładu, można dodać logikę wyboru
+    forecast_datetime = f"{user_datetime.strftime('%Y-%m-%d')} {run}:00 UTC"
+    grib_file = download_gfs_subset(start_lat, start_lon, gfs_date, run)
     if grib_file:
-        st.session_state.wind_profile = parse_gfs_data(grib_file, start_lat, start_lon)
+        st.session_state.wind_profile = parse_gfs_data(grib_file, start_lat, start_lon, forecast_datetime)
+        st.session_state.forecast_info = forecast_datetime
         os.remove(grib_file)
         st.session_state.trajectory_df = simulate_balloon(
             start_lat, start_lon, ascent_rate, descent_rate, burst_altitude, st.session_state.wind_profile
         )
 
+# --- Wyświetlanie wyników ---
 if st.session_state.wind_profile is not None:
-    st.write("### Profil wiatru (do 30 km)")
+    st.subheader(f"Profil wiatru – dane GFS z: {st.session_state.forecast_info}")
     st.dataframe(st.session_state.wind_profile, key="wind_table")
 
 if st.session_state.trajectory_df is not None:
-    st.write("### Wyniki symulacji")
+    st.subheader("Wyniki symulacji")
     st.dataframe(st.session_state.trajectory_df, key="traj_table")
 
     csv = st.session_state.trajectory_df.to_csv(index=False).encode('utf-8')
