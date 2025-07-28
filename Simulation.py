@@ -126,8 +126,8 @@ def simulate_balloon(lat, lon, ascent_rate, descent_rate, burst_altitude, wind_p
 # --- Streamlit UI ---
 st.title("Symulacja balonu stratosferycznego (NOAA GFS – do 30 km)")
 
-start_lat = st.number_input("Szerokość geograficzna (Start):", -90.0, 90.0, 52.4072)
-start_lon = st.number_input("Długość geograficzna (Start):", -180.0, 180.0, 16.9252)
+start_lat = st.number_input("Szerokość geograficzna (Start):", -90.0, 90.0, 52.2152)
+start_lon = st.number_input("Długość geograficzna (Start):", -180.0, 180.0, 16.5926)
 
 default_date = datetime.now(timezone.utc)
 user_date = st.date_input("Data startu:", default_date.date())
