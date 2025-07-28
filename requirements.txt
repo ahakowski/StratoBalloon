@@ -1,3 +1,11 @@
 folium
 requests
 numpy
+streamlit 
+matplotlib 
+pandas 
+numpy
+streamlit-folium
+xarray
+cfgrib
+eccodes
