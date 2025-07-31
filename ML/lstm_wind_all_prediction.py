@@ -6,7 +6,9 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
-# Przygotowanie listy poziomów do iteracji
+import joblib  # <- do zapisu skalera
+
+# Mapowanie ciśnienia na wysokość
 pressure_to_height = {
     1000: 0.1, 925: 0.7, 850: 1.5, 700: 3.0, 500: 5.5, 400: 7.2, 300: 9.5,
     250: 10.8, 200: 12.0, 150: 13.5, 100: 16.0, 70: 18.5, 50: 20.5,
@@ -15,17 +17,15 @@ pressure_to_height = {
 levels = list(pressure_to_height.keys())
 levels.sort(reverse=True)
 
-# Przygotowanie folderu wyjściowego na wykresy
+# Foldery na modele, wykresy
 os.makedirs("plots", exist_ok=True)
 os.makedirs("models", exist_ok=True)
 
-
-
 csv_path = "gfs_data.csv"
 df = pd.read_csv(csv_path)
+
 target_lat = 52.4
 target_lon = 16.9
-
 results_summary = []
 
 class WindLSTM(nn.Module):
@@ -49,7 +49,7 @@ for pressure in levels:
     df_filtered.sort_values("Date", inplace=True)
 
     if len(df_filtered) < 10:
-        continue  # pomiń zbyt mało danych
+        continue  # zbyt mało danych
 
     scaler = MinMaxScaler()
     scaled = scaler.fit_transform(df_filtered[["WindSpeed_m_s", "WindDir_deg"]])
@@ -63,8 +63,9 @@ for pressure in levels:
         return np.array(X), np.array(y)
 
     X, y = create_sequences(scaled_df.values, window_size=7)
+    if len(X) < 10:
+        continue
 
-    # Podział danych
     split = int(len(X) * 0.8)
     X_train, X_test = X[:split], X[split:]
     y_train, y_test = y[:split], y[split:]
@@ -110,6 +111,10 @@ for pressure in levels:
     plt.savefig(f"plots/prediction_{pressure}hPa.png")
     plt.close()
 
+    # Zapis modelu i skalera
+    torch.save(model.state_dict(), f"models/model_{pressure}hPa.pt")
+    joblib.dump(scaler, f"models/scaler_{pressure}hPa.pkl")
+
     results_summary.append({
         "Pressure_hPa": pressure,
         "Height_km": pressure_to_height[pressure],
@@ -117,11 +122,7 @@ for pressure in levels:
         "Samples": len(y_test_unscaled)
     })
 
-# Wyświetlenie podsumowania
+# Podsumowanie
 summary_df = pd.DataFrame(results_summary).sort_values("Height_km")
 print("📊 Podsumowanie wyników modelu LSTM:\n")
-print(summary_df.to_string(index=False))  # czytelna forma w terminalu
-
-# (opcjonalnie) zapis do pliku
-#summary_df.to_csv("lstm_results_summary.csv", index=False)
-
+print(summary_df.to_string(index=False))
