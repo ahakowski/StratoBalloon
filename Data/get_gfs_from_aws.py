@@ -24,7 +24,7 @@ rightlon = center_lon + delta_deg
 target_levels = [1000, 925, 850, 700, 500, 400, 300, 250, 200, 150, 100, 70, 50, 30, 20, 10]
 
 today = datetime.utcnow()
-dates = [(today - timedelta(days=i)).strftime("%Y%m%d") for i in range(90)]
+dates = [(today - timedelta(days=i)).strftime("%Y%m%d") for i in range(360)]
 
 all_data = []
 
