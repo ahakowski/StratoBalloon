@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 import tempfile
 import xarray as xr
 import os
-import warnings
 
 # --- Funkcja pobierania GFS subset ---
 def download_gfs_subset(lat, lon, date, run):
@@ -64,10 +63,7 @@ def pressure_to_altitude(pressure_hpa):
 
 # --- Parsowanie danych GFS ---
 def parse_gfs_data(grib_file, lat, lon, forecast_datetime):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        ds = xr.open_dataset(grib_file, engine="cfgrib")
-
+    ds = xr.open_dataset(grib_file, engine="cfgrib")
     u_wind = ds["u"].sel(latitude=lat, longitude=lon, method="nearest")
     v_wind = ds["v"].sel(latitude=lat, longitude=lon, method="nearest")
 
@@ -99,6 +95,7 @@ def simulate_balloon(lat, lon, ascent_rate, descent_rate, burst_altitude, wind_p
     current_lat, current_lon = lat, lon
     t = 0  # czas w sekundach od startu
 
+    # Wznoszenie
     for h in range(100, burst_altitude + 100, 100):
         wind_speed, wind_dir = interpolate_wind(wind_profile, h)
         dt = 100 / ascent_rate
@@ -110,6 +107,7 @@ def simulate_balloon(lat, lon, ascent_rate, descent_rate, burst_altitude, wind_p
         burst_flag = "Yes" if h == burst_altitude else ""
         data.append((t / 60, current_lat, current_lon, h, wind_speed, wind_dir, burst_flag))
 
+    # Opadanie
     for h in range(burst_altitude - 100, 0, -100):
         wind_speed, wind_dir = interpolate_wind(wind_profile, h)
         dt = 100 / abs(descent_rate)
@@ -127,7 +125,7 @@ def simulate_balloon(lat, lon, ascent_rate, descent_rate, burst_altitude, wind_p
 
 # --- Streamlit UI ---
 st.title("Symulacja balonu stratosferycznego (NOAA GFS – do 30 km)")
-
+                                                                            #52.364738356760796, 16.990724569853835            
 start_lat = st.number_input("Szerokość geograficzna (Start):", -90.0, 90.0, 52.3647)
 start_lon = st.number_input("Długość geograficzna (Start):", -180.0, 180.0, 16.9907)
 
@@ -140,33 +138,32 @@ ascent_rate = st.number_input("Prędkość wznoszenia (m/s):", 1.0, 20.0, 5.0)
 descent_rate = st.number_input("Prędkość opadania (m/s):", -30.0, -1.0, -8.0)
 burst_altitude = st.number_input("Wysokość pęknięcia (m):", 1000, 35000, 30000)
 
+if "wind_profile" not in st.session_state:
+    st.session_state.wind_profile = None
+if "trajectory_df" not in st.session_state:
+    st.session_state.trajectory_df = None
+if "forecast_info" not in st.session_state:
+    st.session_state.forecast_info = None
+
 if st.button("Pobierz dane GFS i uruchom symulację"):
     gfs_date = user_datetime.strftime("%Y%m%d")
-    run = "06"
+    run = "06"  # dla przykładu, można dodać logikę wyboru
     forecast_datetime = f"{user_datetime.strftime('%Y-%m-%d')} {run}:00 UTC"
     grib_file = download_gfs_subset(start_lat, start_lon, gfs_date, run)
-
     if grib_file:
-        try:
-            wind_df = parse_gfs_data(grib_file, start_lat, start_lon, forecast_datetime)
-            st.session_state.wind_profile = wind_df
-            st.session_state.forecast_info = forecast_datetime
-
-            trajectory_df = simulate_balloon(
-                start_lat, start_lon, ascent_rate, descent_rate, burst_altitude, wind_df
-            )
-            st.session_state.trajectory_df = trajectory_df
-
-            os.remove(grib_file)
-        except Exception as e:
-            st.error(f"Błąd przetwarzania danych: {e}")
+        st.session_state.wind_profile = parse_gfs_data(grib_file, start_lat, start_lon, forecast_datetime)
+        st.session_state.forecast_info = forecast_datetime
+        os.remove(grib_file)
+        st.session_state.trajectory_df = simulate_balloon(
+            start_lat, start_lon, ascent_rate, descent_rate, burst_altitude, st.session_state.wind_profile
+        )
 
 # --- Wyświetlanie wyników ---
-if "wind_profile" in st.session_state and st.session_state.wind_profile is not None:
+if st.session_state.wind_profile is not None:
     st.subheader(f"Profil wiatru – dane GFS z: {st.session_state.forecast_info}")
     st.dataframe(st.session_state.wind_profile, key="wind_table")
 
-if "trajectory_df" in st.session_state and st.session_state.trajectory_df is not None:
+if st.session_state.trajectory_df is not None:
     st.subheader("Wyniki symulacji")
     st.dataframe(st.session_state.trajectory_df, key="traj_table")
 
