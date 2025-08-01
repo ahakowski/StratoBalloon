@@ -126,3 +126,7 @@ for pressure in levels:
 summary_df = pd.DataFrame(results_summary).sort_values("Height_km")
 print("📊 Podsumowanie wyników modelu LSTM:\n")
 print(summary_df.to_string(index=False))
+
+# Eksport do CSV
+summary_df.to_csv("results_summary.csv", index=False)
+print("\n✅ Wyniki zostały zapisane do pliku: results_summary.csv")
