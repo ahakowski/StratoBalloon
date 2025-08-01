@@ -26,5 +26,5 @@ Wyniki predykcji prędkości wiatru dla różnych poziomów ciśnienia:
 
 ## Kontakt
 
-**mgr inż. Adam Hakowski**  
+**Adam Hakowski**  
 📧 a.hakowski@hqs.cloud
