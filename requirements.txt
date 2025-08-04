@@ -11,4 +11,4 @@ cfgrib
 eccodes
 torch
 joblib
-sklearn
+scikit-learn
