@@ -10,3 +10,4 @@ xarray
 cfgrib
 eccodes
 torch
+joblib
