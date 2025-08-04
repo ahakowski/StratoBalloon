@@ -9,3 +9,4 @@ streamlit-folium
 xarray
 cfgrib
 eccodes
+torch
